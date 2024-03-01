@@ -94,7 +94,7 @@ HAVING (SUM(b.sb) + SUM(b.cs)) >= 20
 ORDER BY percent_successful DESC
 LIMIT 1;
 
--- 7.  From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
+-- 7.A.  From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. 
 	(SELECT name,
 	 		MAX(w) AS team_with_most_wins,
 	 		'most wins | lost WS' AS label
@@ -132,7 +132,20 @@ UNION
 /*		"Seattle Mariners"	116	"most wins | lost WS"
 		"St. Louis Cardinals"	83	"least wins | won WS | not on strike"
 		"Los Angeles Dodgers"	63	"least wins | won WS | on strike"	
-		In 1981 the MLB went on strike*/
+		In 1981 the MLB went on strike*/  
+
+-- 7.B. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
+WITH wins_and_ws AS
+					(SELECT yearid,
+							CASE WHEN wswin = 'Y' AND w = MAX(w) OVER(PARTITION BY yearid) THEN 1
+								ELSE 0 END AS winner_and_highest
+					FROM teams
+					WHERE yearid >= 1970)
+
+SELECT SUM(winner_and_highest) AS num_occurances,
+		ROUND(SUM(winner_and_highest) / COUNT(DISTINCT yearid)::NUMERIC * 100, 2) || '%' AS percent_occured
+FROM wins_and_ws;
+		
 
 -- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
 
