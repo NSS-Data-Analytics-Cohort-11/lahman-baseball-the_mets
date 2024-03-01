@@ -7,26 +7,16 @@ FROM homegames
 -- 		A. 1871-2016
 
 -- 2. Find the name and height of the shortest player in the database. How many games did he play in? What is the name of the team for which he played?
--- height 43in
-SELECT MIN(height::INTEGER)
-FROM people
-
-SELECT namefirst,
-		namelast,
-		namegiven,
-		height
-FROM people
+SELECT CONCAT(p.namefirst, ' ', p.namelast) AS full_name,
+		p.namegiven,
+		p.height,
+		a.g_all
+FROM people AS p
+INNER JOIN appearances AS a
+ON p.playerid = a.playerid
 WHERE height = (SELECT MIN(height::INTEGER)
-				FROM people)
--- 			A. "Eddie"	"Gaedel"	"Edward Carl"	43in
-
-SELECT g_all
-FROM appearances
-WHERE playerid = (SELECT playerid
-					FROM people
-					WHERE height = (SELECT MIN(height::INTEGER)
-					FROM people))
--- 			A. 1 game
+				FROM people);
+-- 			A. "Eddie Gaedel"	"Edward Carl"	43	1
 
 /* ***** Final Query ***** */
 SELECT CONCAT(p.namefirst, ' ', p.namelast) AS player_name,
@@ -49,24 +39,17 @@ FROM schools
 WHERE schoolname ILIKE '%vanderbilt%'
 -- 		A. "vandy"
 
-SELECT COUNT(DISTINCT p.playerid)
-FROM people AS p
-INNER JOIN collegeplaying AS c
-ON p.playerid = c.playerid
-WHERE c.schoolid = 'vandy'
--- 24 different players at Vandy
-
-SELECT CONCAT(p.namefirst, ' ', p.namelast) AS player_name,
-		SUM(COALESCE(s.salary, 0)) AS total_salary
-FROM people AS p
-LEFT JOIN salaries AS s
-ON p.playerid = s.playerid
-INNER JOIN collegeplaying AS c
-ON p.playerid = c.playerid
-WHERE c.schoolid = 'vandy'
-GROUP BY CONCAT(p.namefirst, ' ', p.namelast)
+SELECT p.namefirst || ' ' || p.namelast AS full_name, SUM(s.salary) AS total_salary
+FROM salaries AS s
+INNER JOIN people AS p
+ON s.playerid = p.playerid
+WHERE s.playerid IN 
+				(SELECT DISTINCT playerid
+				FROM collegeplaying
+				WHERE schoolid = 'vandy')
+GROUP BY p.namefirst, p.namelast
 ORDER BY total_salary DESC;
--- 		A. "David Price"	245553888
+-- 			A. "David Price"	81851296
 
 -- 4. Using the fielding table, group players into three groups based on their position: label players with position OF as "Outfield", those with position "SS", "1B", "2B", and "3B" as "Infield", and those with position "P" or "C" as "Battery". Determine the number of putouts made by each of these three groups in 2016.
 SELECT CASE WHEN pos = 'OF' THEN 'Outfield'
@@ -83,12 +66,12 @@ GROUP BY position;
 			  
 -- 5. Find the average number of strikeouts per game by decade since 1920. Round the numbers you report to 2 decimal places. Do the same for home runs per game. Do you see any trends?
 SELECT 10 * FLOOR(yearid/10) AS decade,
-ROUND(SUM(so) / SUM(g)::NUMERIC, 2) AS avg_so_game,
-ROUND(SUM(hr) / SUM(g)::NUMERIC, 2) AS avg_hr_game
+		ROUND(SUM(so) / SUM(g)::NUMERIC, 2) AS avg_so_game,
+		ROUND(SUM(hr) / SUM(g)::NUMERIC, 2) AS avg_hr_game
 FROM teams
 WHERE yearid >= 1920
 GROUP BY decade
-ORDER BY decade
+ORDER BY decade;
 -- 		A. Both strikeouts and home runs are increasing over the decades.
 
 -- SELECT 10 * FLOOR(yearid/10) AS decade,
@@ -100,5 +83,60 @@ ORDER BY decade
 -- ORDER BY decade
 
 -- 6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
+SELECT p.namefirst || ' ' || p.namelast AS name,
+		ROUND(SUM(b.sb) / (SUM(b.sb) + SUM(b.cs))::NUMERIC * 100, 2) || '%' AS percent_successful
+FROM batting AS b
+INNER JOIN people AS p
+ON b.playerid = p.playerid
+WHERE b.yearid = 2016
+GROUP BY b.playerid, p.namefirst, p.namelast
+HAVING (SUM(b.sb) + SUM(b.cs)) >= 20
+ORDER BY percent_successful DESC
+LIMIT 1;
+
+-- 7.  From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
+	(SELECT name,
+	 		MAX(w) AS team_with_most_wins,
+	 		'most wins | lost WS' AS label
+	FROM teams
+	WHERE yearid >= 1970
+		AND wswin = 'N'
+	GROUP BY name
+	ORDER BY team_with_most_wins DESC
+	LIMIT 1)
+
+UNION
+
+	(SELECT name,
+	 		MIN(w) AS team_with_most_wins,
+	 		'least wins | won WS | on strike' AS label
+	FROM teams
+	WHERE yearid >= 1970
+		AND wswin = 'Y'
+	GROUP BY name
+	ORDER BY team_with_most_wins
+	LIMIT 1)
+
+UNION
+
+	(SELECT name,
+	 		MIN(w) AS team_with_most_wins,
+	 		'least wins | won WS | not on strike' AS label
+	FROM teams
+	WHERE yearid >= 1970
+		AND yearid <> 1981
+		AND wswin = 'Y'
+	GROUP BY name
+	ORDER BY team_with_most_wins
+	LIMIT 1);
+/*		"Seattle Mariners"	116	"most wins | lost WS"
+		"St. Louis Cardinals"	83	"least wins | won WS | not on strike"
+		"Los Angeles Dodgers"	63	"least wins | won WS | on strike"	
+		In 1981 the MLB went on strike*/
+
+-- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+
+
+
 
 
