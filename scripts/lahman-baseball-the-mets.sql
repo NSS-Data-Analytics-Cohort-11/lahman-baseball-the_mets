@@ -80,3 +80,25 @@ GROUP BY position;
  		/* A. "Battery"	41424
  			  "Infield"	58934
 			  "Outfield"29560 */
+			  
+-- 5. Find the average number of strikeouts per game by decade since 1920. Round the numbers you report to 2 decimal places. Do the same for home runs per game. Do you see any trends?
+SELECT 10 * FLOOR(yearid/10) AS decade,
+ROUND(SUM(so) / SUM(g)::NUMERIC, 2) AS avg_so_game,
+ROUND(SUM(hr) / SUM(g)::NUMERIC, 2) AS avg_hr_game
+FROM teams
+WHERE yearid >= 1920
+GROUP BY decade
+ORDER BY decade
+-- 		A. Both strikeouts and home runs are increasing over the decades.
+
+-- SELECT 10 * FLOOR(yearid/10) AS decade,
+-- ROUND(SUM(soa) / SUM(g)::NUMERIC, 2) AS avg_soa_game,
+-- ROUND(SUM(hra) / SUM(g)::NUMERIC, 2) AS avg_hra_game
+-- FROM teams
+-- WHERE yearid >= 1920
+-- GROUP BY decade
+-- ORDER BY decade
+
+-- 6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
+
+
