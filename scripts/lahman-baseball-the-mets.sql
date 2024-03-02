@@ -88,13 +88,14 @@ SELECT p.namefirst || ' ' || p.namelast AS name,
 FROM batting AS b
 INNER JOIN people AS p
 ON b.playerid = p.playerid
-WHERE b.yearid = 2016
+WHERE b.yearid = 2016									/* FILTER for 2016 */
 GROUP BY b.playerid, p.namefirst, p.namelast
-HAVING (SUM(b.sb) + SUM(b.cs)) >= 20
+HAVING (SUM(b.sb) + SUM(b.cs)) >= 20					/* FILTER for at least 20 attempts */
 ORDER BY percent_successful DESC
 LIMIT 1;
 
 -- 7.A.  From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. 
+	/* Team with most wins, lost WS */
 	(SELECT name,
 	 		MAX(w) AS team_with_most_wins,
 	 		'most wins | lost WS' AS label
@@ -107,6 +108,7 @@ LIMIT 1;
 
 UNION
 
+	/* Team with least wins, won WS, STRIKE YEAR 1981 */
 	(SELECT name,
 	 		MIN(w) AS team_with_most_wins,
 	 		'least wins | won WS | on strike' AS label
@@ -119,6 +121,7 @@ UNION
 
 UNION
 
+	/* Team with least wins, won WS, NOT STRIKE YEAR 1981 */
 	(SELECT name,
 	 		MIN(w) AS team_with_most_wins,
 	 		'least wins | won WS | not on strike' AS label
@@ -136,20 +139,23 @@ UNION
 
 -- 7.B. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 WITH wins_and_ws AS
+					/* if a team won WS asnd had the most winsa that year */
 					(SELECT yearid,
-							CASE WHEN wswin = 'Y' AND w = MAX(w) OVER(PARTITION BY yearid) THEN 1
+							CASE WHEN wswin = 'Y' AND w = MAX(w) OVER(PARTITION BY yearid) THEN 1		/* INTEGER: 1=yes, 0=no */
 								ELSE 0 END AS winner_and_highest
 					FROM teams
 					WHERE yearid >= 1970)
 
-SELECT SUM(winner_and_highest) AS num_occurances,
-		ROUND(SUM(winner_and_highest) / COUNT(DISTINCT yearid)::NUMERIC * 100, 2) || '%' AS percent_occured
+SELECT SUM(winner_and_highest) AS num_occurances,																/* number of times WS winner team had the most wins */
+		ROUND(SUM(winner_and_highest) / COUNT(DISTINCT yearid)::NUMERIC * 100, 2) || '%' AS percent_occured		/* percentage team w/ most wins won WS */
 FROM wins_and_ws;
 		
 
 -- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
 WITH top_bottom_5 AS
-					((SELECT SUM(attendance) / games AS avg_attendance,
+
+					(	/* top 5 avg attendance in 2016 with at least 10 games */
+						(SELECT SUM(attendance) / games AS avg_attendance,
 									park,
 									team,
 					  				year,
@@ -162,7 +168,7 @@ WITH top_bottom_5 AS
 								LIMIT 5)
 
 						UNION
-
+							/* bottom 5 avg attendance in 2016 with at least 10 games */
 							(SELECT SUM(attendance) / games AS avg_attendance,
 									park,
 									team,
@@ -173,34 +179,40 @@ WITH top_bottom_5 AS
 									AND games >= 10
 								GROUP BY park, games, team, year
 								ORDER BY avg_attendance
-								LIMIT 5))
+								LIMIT 5)
+					)
 
-SELECT RANK () OVER (ORDER BY tb.avg_attendance) AS rank,
+SELECT RANK () OVER (ORDER BY tb.avg_attendance) AS rank, /* Add rank */
 		p.park_name,
 		t.name,
 		tb.avg_attendance,
 		tb.top_or_bottom
 FROM teams AS t
 INNER JOIN top_bottom_5 AS tb
-ON (t.teamid, t.yearid) = (tb.team, tb.year)
+ON (t.teamid, t.yearid) = (tb.team, tb.year)	/* JOIN only for the top and bottom 5 in 2016 */
 INNER JOIN parks AS p
 ON tb.park = p.park
 ORDER BY avg_attendance DESC;
 
 -- 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 WITH tsn_both_leagues AS
-						((SELECT playerid
+						/* managers who won tsn in BOTH leagues */
+						(
+						/* managers who won tsn in the l league */
+						(SELECT playerid
 						FROM awardsmanagers
 						WHERE awardid ILIKE '%tsn%'
 							AND lgid = 'AL')
 			INTERSECT
+						/* managers who won tsn in the nl league */
 						(SELECT playerid
 						FROM awardsmanagers
 						WHERE awardid ILIKE '%tsn%'
-							AND lgid = 'NL'))
+							AND lgid = 'NL')
+						)
 
 SELECT  p.namefirst || ' ' || p.namelast AS name,
-		am.yearid AS year,
+		am.yearid AS year, /* year award was won */
 		t.name AS team_name,
 		am.lgid AS league,
 		am.awardid AS award
@@ -208,18 +220,20 @@ FROM awardsmanagers AS am
 LEFT JOIN people AS p
 ON am.playerid = p.playerid
 LEFT JOIN managers AS m
-ON (am.playerid, am.yearid) = (m.playerid, m.yearid)
+ON (am.playerid, am.yearid) = (m.playerid, m.yearid)			/* Only join managers for the year the award was won */
 LEFT JOIN teams AS t
-ON (m.teamid, m.yearid) = (t.teamid, t.yearid)
-WHERE am.playerid IN (SELECT playerid FROM tsn_both_leagues)
-	AND am.awardid ILIKE '%tsn%'
-	AND (am.lgid = 'NL' OR am.lgid = 'AL')
+ON (m.teamid, m.yearid) = (t.teamid, t.yearid)					/* Only join teams for the year the award was won */
+WHERE am.playerid IN (SELECT playerid FROM tsn_both_leagues) /* FILTER for only managers who won in both leagues */
+	AND am.awardid ILIKE '%tsn%'								/* FILTER for only the tsn award */
+	AND (am.lgid = 'NL' OR am.lgid = 'AL')						/* FILTER for only nl or al */
 ORDER BY year;
 
 
 -- 10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
 WITH highest_2016 AS
+				/* return playerid and number of home runs if max was in 2016 */
 			(SELECT  playerid,
+						/* return hr when 2016 AND player hit their max hr */
 						CASE WHEN hr = MAX(hr) OVER (PARTITION BY playerid) AND yearid = 2016 THEN hr
 								END AS career_highest_2016
 				FROM batting
@@ -235,3 +249,17 @@ WHERE h.career_highest_2016 IS NOT NULL
 	AND h.career_highest_2016 > 0
 	AND DATE_PART('year', p.debut::DATE) <= 2007
 ORDER BY num_hr DESC;
+
+/* ********************************************************************************* */
+/* ***************************** OPENED ENDED QUESTIONS **************************** */
+/* ********************************************************************************* */
+SELECT e / g AS errors_per_game,
+		ROUND(w / l::NUMERIC, 2) as w_l_ratio,
+		l,
+		AVG(e/g) OVER()
+FROM teams
+WHERE g >
+ORDER BY l
+
+SELECT MIN(g), max(g), AVG(g)
+FROM teams
