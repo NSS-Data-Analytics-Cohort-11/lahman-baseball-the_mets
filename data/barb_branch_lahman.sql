@@ -88,23 +88,21 @@ order by decade
 
 ************************************************************************************************
 
--- 6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
+-- 6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.  !!! GOOD TO GO :)
 
 
 select 
 	CONCAT(namefirst, ' ', namelast) AS player_name,
-	count(sb + cs) * 100 / sum(sb + cs)
-	
--- 	(sb + cs / SUM(sb + cs)) *100 AS stolen_bases                             !!! NEEDS REVIEW !!!
+	sb,
+	(sb + cs) as attempts,
+	sb * 100 / (sb + cs) as sb_pct                          
 from batting
--- where yearid = 2016
--- 	and sb >= 20
 INNER JOIN people
 USING (playerid)
 WHERE yearid = 2016
-	AND sb >= 20
+	AND (sb + cs) >= 20
 group by yearid, player_name, sb, cs
--- order by stolen_bases
+order by sb_pct desc
 
 ************************************************************************************************
 
@@ -152,12 +150,13 @@ select
 	yearid as year,
 	name as team,
 	WSWin as world_series_winner,
-	w AS wins,                                                             -- !!! ALMOST DONE, NEED TO FINALIZE THE END OF THE QUESTION !!! --
+	MAX(w) AS wins,                                                             -- !!! ALMOST DONE, NEED TO FINALIZE THE END OF THE QUESTION !!! --
 	l as losses
 from teams
 where WSWin is not null
 	and WSWin = 'N'
 	and yearid BETWEEN 1970 AND 2016
+group by year, team, world_series_winner, losses
 	
 UNION ALL
 
@@ -165,12 +164,13 @@ select
 	yearid as year,
 	name as team,
 	WSWin as world_series_winner,
-	w AS wins,
+	MAX(w) AS wins,
 	l AS losses
 from teams
 where wswin is not null
 	and wswin = 'Y'
 	and yearid BETWEEN 1970 AND 2016
+group by year, team, world_series_winner, losses
 )
 
 
@@ -181,8 +181,7 @@ SELECT
 	wins
 FROM teams_1970_2016
 WHERE year <> 1981
--- 	AND world_series_winner = 'Y'
-ORDER BY year;
+ORDER BY wins DESC;
 
 ************************************************************************************************
 
@@ -190,12 +189,16 @@ ORDER BY year;
 
 (
 SELECT 
-	hg.park,
+	park_name,
 	t.name,
-	SUM(hg.attendance) / SUM(hg.games) AS avg_attendance_per_game
-FROM homegames as hg
+	hg.attendance / hg.games
+	--SUM(hg.attendance) / SUM(hg.games) AS avg_attendance_per_game
+FROM parks as p
+INNER JOIN homegames as hg
+USING (park)
 INNER JOIN teams as t
-ON hg.team = t.teamid
+USING (park)
+                                             /* UPDATE... */
 
 WHERE yearid = 2016
 	AND games >= 10
@@ -208,9 +211,11 @@ UNION ALL
 
 (
 SELECT 
-	hg.park,
+	park_name,
 	t.name,
-	SUM(hg.attendance) / SUM(hg.games) AS avg_attendance_per_game
+	hg.attendance / hg.games
+	--SUM(hg.attendance) / SUM(hg.games) AS avg_attendance_per_game
+	
 FROM homegames as hg
 INNER JOIN teams as t
 ON hg.team = t.teamid
@@ -226,12 +231,92 @@ LIMIT 5
 
 -- 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 
+SELECT
+	t.yearid,
+	CONCAT(p.namefirst, ' ', p.namelast) AS manager_name,
+	am.awardid,
+	t.name
+
+FROM people as p
+JOIN awardsmanagers as am
+USING (playerid)
+JOIN managers as m
+ON am.playerid = m.playerid AND am.yearid = m.yearid
+JOIN teams as t
+ON m.yearid = t.yearid AND m.teamid = t.teamid
+
+	
+
+WHERE awardid = 'TSN Manager of the Year'
+	and p.playerid IN (select playerid from awardsmanagers where awardid = 'TSN Manager of the Year' and lgid = 'NL')
+	and p.playerid IN (select playerid from awardsmanagers where awardid = 'TSN Manager of the Year' and lgid = 'AL')
+
+ORDER BY manager_name
+
+************************************************************************************************
+
+-- 10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+
+-- all players in 2016 with their total of homeruns
+SELECT 
+	playerid,
+	CONCAT(namefirst, ' ', namelast) AS player_name,
+	SUM(hr) as total_homeruns
+from batting
+INNER JOIN people
+using(playerid)
+where yearid = 2016
+	and hr > 0
+group by playerid, player_name
+order by total_homeruns desc
+ 
 
 
-select teamid, name, playerid
-from managers
-inner join teams
-using (teamid)
+
+--Jessica's Code
+SELECT
+    p.namefirst || ' ' || p.namelast AS player_name,
+    b.hr AS home_runs_2016
+FROM batting AS b
+INNER JOIN people AS p ON b.playerID = p.playerid
+WHERE b.yearid = 2016
+	AND hr > 0
+	AND EXTRACT(YEAR FROM debut::date) <= 2016 - 9
+    AND b.hr = (
+        SELECT MAX(hr)
+        FROM batting
+        WHERE playerid = b.playerid)
+ORDER BY home_runs_2016 DESC;
+
+
+--Derek's code
+WITH highest_2016 AS
+				/* return playerid and number of home runs if max was in 2016 */
+			(SELECT  playerid,
+						/* return hr when 2016 AND player hit their max hr */
+						CASE WHEN hr = MAX(hr) OVER (PARTITION BY playerid) AND yearid = 2016 THEN hr
+								END AS career_highest_2016
+				FROM batting
+				GROUP BY playerid, hr, yearid
+				ORDER BY playerid)
+
+SELECT  p.namefirst || ' ' || p.namelast AS name,
+		h.career_highest_2016 AS num_hr
+FROM highest_2016 AS h
+LEFT JOIN people AS p
+	ON h.playerid = p.playerid
+WHERE h.career_highest_2016 IS NOT NULL
+	AND h.career_highest_2016 > 0
+	AND DATE_PART('year', p.debut::DATE) <= 2007
+ORDER BY num_hr DESC;
+
+
+
+
+
+
+
+
 
 
 
