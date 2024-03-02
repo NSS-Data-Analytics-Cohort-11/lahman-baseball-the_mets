@@ -191,7 +191,7 @@ SELECT
     p.namefirst || ' ' || p.namelast AS player_name,
     b.hr AS home_runs_2016
 FROM batting AS b
-JOIN people AS p ON b.playerID = p.playerid
+INNER JOIN people AS p ON b.playerID = p.playerid
 WHERE b.yearid = 2016
 	AND hr > 0
 	AND EXTRACT(YEAR FROM debut::date) <= 2016 - 9
@@ -210,10 +210,3 @@ ORDER BY home_runs_2016 DESC;
 --   *  Do teams that win the world series see a boost in attendance the following year? What about teams that made the playoffs? Making the playoffs means either being a division winner or a wild card winner.
 
 -- 13. It is thought that since left-handed pitchers are more rare, causing batters to face them less often, that they are more effective. Investigate this claim and present evidence to either support or dispute this claim. First, determine just how rare left-handed pitchers are compared with right-handed pitchers. Are left-handed pitchers more likely to win the Cy Young Award? Are they more likely to make it into the hall of fame?
-
-Solo exploration ideas:
-Correlation between salary and performance (scatterplot, avg salary for each quartile of wins, hypothesis test...) Would need to account for mid-season trades? Is this reflected in tables?
-SELECT * FROM salaries ORDER BY playerid, teamid
-	
---OR moneyball effect
-
