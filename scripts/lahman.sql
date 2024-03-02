@@ -122,18 +122,84 @@ FROM wins;
 
 /*8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.*/
 
-SELECT team,
-	park,
-	SUM(attendance) / SUM(games) * 100 AS avg_attendance
+(SELECT 'Top 5' AS top_or_bottom,
+ 	RANK() OVER(ORDER BY SUM(homegames.attendance) / SUM(games) DESC) AS rank,
+	teams.name AS team_name,
+	park_name,
+	SUM(homegames.attendance) / SUM(games) AS avg_attendance
 FROM homegames
+LEFT JOIN parks
+USING(park)
+LEFT JOIN teams
+ON teams.teamid = homegames.team AND teams.yearid = homegames.year
 WHERE year = 2016
+	AND games >= 10
+GROUP BY teams.name, park_name	
 ORDER BY avg_attendance DESC
-LIMIT
+LIMIT 5)
+UNION
+(SELECT 'Bottom 5',
+	RANK() OVER(ORDER BY SUM(homegames.attendance) / SUM(games)) AS rank,
+ 	teams.name,
+	park_name,
+	SUM(homegames.attendance) / SUM(games) AS avg_attendance
+FROM homegames
+LEFT JOIN parks
+USING(park)
+LEFT JOIN teams
+ON teams.teamid = homegames.team AND teams.yearid = homegames.year
+WHERE year = 2016
+	AND games >= 10
+GROUP BY teams.name, park_name	
+ORDER BY avg_attendance
+LIMIT 5)
+ORDER BY avg_attendance DESC;
 
 /*9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.*/
 
-/*10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players first and last names and the number of home runs they hit in 2016.*/
-
+WITH winners AS (
+	(SELECT playerid
+	FROM awardsmanagers
+	WHERE awardid = 'TSN Manager of the Year'
+		AND lgid = 'NL')
+	INTERSECT
+	(SELECT playerid
+	FROM awardsmanagers
+	WHERE awardid = 'TSN Manager of the Year'
+		AND lgid = 'AL')
+)
+SELECT namefirst || ' ' || namelast AS manager_name,
+	awardid AS award,
+	awardsmanagers.lgid AS league,
+	awardsmanagers.yearid AS year,
+	teams.name
+FROM awardsmanagers
+INNER JOIN people
+USING(playerid)
+INNER JOIN managers
+USING(yearid, playerid)
+INNER JOIN teams
+USING(teamid, yearid)
+WHERE awardid = 'TSN Manager of the Year'
+	AND awardsmanagers.lgid <> 'ML'
+	AND playerid IN (SELECT playerid FROM winners)
+ORDER BY manager_name, year;
+	
+/*10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players first and last names and the number of home runs they hit in 2016*/
+	
+SELECT
+    p.namefirst || ' ' || p.namelast AS player_name,
+    b.hr AS home_runs_2016
+FROM batting AS b
+JOIN people AS p ON b.playerID = p.playerid
+WHERE b.yearid = 2016
+	AND hr > 0
+	AND EXTRACT(YEAR FROM debut::date) <= 2016 - 9
+    AND b.hr = (
+        SELECT MAX(hr)
+        FROM batting
+        WHERE playerid = b.playerid)
+ORDER BY home_runs_2016 DESC;
 
 -- Open-ended questions
 
@@ -145,4 +211,9 @@ LIMIT
 
 -- 13. It is thought that since left-handed pitchers are more rare, causing batters to face them less often, that they are more effective. Investigate this claim and present evidence to either support or dispute this claim. First, determine just how rare left-handed pitchers are compared with right-handed pitchers. Are left-handed pitchers more likely to win the Cy Young Award? Are they more likely to make it into the hall of fame?
 
-  
+Solo exploration ideas:
+Correlation between salary and performance (scatterplot, avg salary for each quartile of wins, hypothesis test...) Would need to account for mid-season trades? Is this reflected in tables?
+SELECT * FROM salaries ORDER BY playerid, teamid
+	
+--OR moneyball effect
+
