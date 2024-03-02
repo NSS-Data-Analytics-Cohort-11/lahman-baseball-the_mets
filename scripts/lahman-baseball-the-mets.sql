@@ -148,36 +148,90 @@ FROM wins_and_ws;
 		
 
 -- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
-SELECT p.park_name,
-		top_bottom_5.avg_attendance,
-		top_bottom_5.top_or_bottom
-FROM
-		((SELECT SUM(attendance) / games AS avg_attendance,
-				park,
-		  		'top' AS top_or_bottom
-			FROM homegames
-			WHERE year = 2016
-				AND games >= 10
-			GROUP BY park, games
-			ORDER BY avg_attendance DESC
-			LIMIT 5)
+WITH top_bottom_5 AS
+					((SELECT SUM(attendance) / games AS avg_attendance,
+									park,
+									team,
+					  				year,
+									'top' AS top_or_bottom
+								FROM homegames
+								WHERE year = 2016
+									AND games >= 10
+								GROUP BY park, games, team, year
+								ORDER BY avg_attendance DESC
+								LIMIT 5)
 
-	UNION
+						UNION
 
-		(SELECT SUM(attendance) / games AS avg_attendance,
-				park,
-		 		'bottom' AS top_or_bottom
-			FROM homegames
-			WHERE year = 2016
-				AND games >= 10
-			GROUP BY park, games
-			ORDER BY avg_attendance
-			LIMIT 5)) AS top_bottom_5
+							(SELECT SUM(attendance) / games AS avg_attendance,
+									park,
+									team,
+							 		year,
+									'bottom' AS top_or_bottom
+								FROM homegames
+								WHERE year = 2016
+									AND games >= 10
+								GROUP BY park, games, team, year
+								ORDER BY avg_attendance
+								LIMIT 5))
+
+SELECT RANK () OVER (ORDER BY tb.avg_attendance) AS rank,
+		p.park_name,
+		t.name,
+		tb.avg_attendance,
+		tb.top_or_bottom
+FROM teams AS t
+INNER JOIN top_bottom_5 AS tb
+ON (t.teamid, t.yearid) = (tb.team, tb.year)
 INNER JOIN parks AS p
-ON top_bottom_5.park = p.park
+ON tb.park = p.park
 ORDER BY avg_attendance DESC;
 
+-- 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+WITH tsn_both_leagues AS
+						((SELECT playerid
+						FROM awardsmanagers
+						WHERE awardid ILIKE '%tsn%'
+							AND lgid = 'AL')
+			INTERSECT
+						(SELECT playerid
+						FROM awardsmanagers
+						WHERE awardid ILIKE '%tsn%'
+							AND lgid = 'NL'))
+
+SELECT  p.namefirst || ' ' || p.namelast AS name,
+		am.yearid AS year,
+		t.name AS team_name,
+		am.lgid AS league,
+		am.awardid AS award
+FROM awardsmanagers AS am
+LEFT JOIN people AS p
+ON am.playerid = p.playerid
+LEFT JOIN managers AS m
+ON (am.playerid, am.yearid) = (m.playerid, m.yearid)
+LEFT JOIN teams AS t
+ON (m.teamid, m.yearid) = (t.teamid, t.yearid)
+WHERE am.playerid IN (SELECT playerid FROM tsn_both_leagues)
+	AND am.awardid ILIKE '%tsn%'
+	AND (am.lgid = 'NL' OR am.lgid = 'AL')
+ORDER BY year;
 
 
+-- 10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+WITH highest_2016 AS
+			(SELECT  playerid,
+						CASE WHEN hr = MAX(hr) OVER (PARTITION BY playerid) AND yearid = 2016 THEN hr
+								END AS career_highest_2016
+				FROM batting
+				GROUP BY playerid, hr, yearid
+				ORDER BY playerid)
 
-
+SELECT  p.namefirst || ' ' || p.namelast AS name,
+		h.career_highest_2016 AS num_hr
+FROM highest_2016 AS h
+LEFT JOIN people AS p
+	ON h.playerid = p.playerid
+WHERE h.career_highest_2016 IS NOT NULL
+	AND h.career_highest_2016 > 0
+	AND DATE_PART('year', p.debut::DATE) <= 2007
+ORDER BY num_hr DESC;
