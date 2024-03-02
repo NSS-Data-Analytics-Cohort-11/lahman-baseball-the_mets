@@ -134,14 +134,88 @@ FROM wins
 Only consider parks where there were at least 10 games played. 
 Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.*/
 
-SELECT *
-FROM homegames;
-
-SELECT team, park, attendance / games AS avg_attendance
+(SELECT name, park_name, SUM(homegames.attendance) / SUM(homegames.games) AS avg_attendance,
+ 'top 5' AS top_or_bottom,
+ RANK() OVER(ORDER BY SUM(homegames.attendance) / SUM(homegames.games) DESC) AS rank
 FROM homegames
+INNER JOIN parks
+USING (park)
+INNER JOIN teams
+ON teams.teamid = homegames.team AND teams.yearid = homegames.year
 WHERE year = '2016' AND games > 10
+GROUP BY name, park_name
 ORDER BY avg_attendance DESC
-LIMIT 5;
+LIMIT 5)
+UNION
+(SELECT name, park_name, SUM(homegames.attendance) / SUM(homegames.games) AS avg_attendance, 
+'bottom 5' AS top_or_bottom,
+ RANK() OVER(ORDER BY SUM(homegames.attendance) / SUM(homegames.games) ASC) AS rank
+FROM homegames
+INNER JOIN parks
+USING (park)
+INNER JOIN teams
+ON teams.teamid = homegames.team AND teams.yearid = homegames.year
+WHERE year = '2016' AND games > 10
+GROUP BY name, park_name
+ORDER BY avg_attendance ASC
+LIMIT 5)
+ORDER BY avg_attendance DESC
+
+/* QUESTION 9: Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? 
+Give their full name and the teams that they were managing when they won the award.*/
+
+WITH winners AS (
+(SELECT playerid
+FROM awardsmanagers
+WHERE awardid = 'TSN Manager of the Year'
+AND lgid = 'NL')
+INTERSECT
+(SELECT playerid
+FROM awardsmanagers
+WHERE awardid = 'TSN Manager of the Year'
+AND lgid = 'AL')
+)
+SELECT namefirst || ' ' || namelast AS manager_name,
+awardid,
+awardsmanagers.lgid,
+awardsmanagers.yearid AS year,
+teamid
+FROM awardsmanagers
+INNER JOIN people
+USING (playerid)
+INNER JOIN managers
+USING (yearid, playerid)
+WHERE awardid = 'TSN Manager of the Year'
+AND awardsmanagers.lgid <> 'ML'
+AND playerid IN (SELECT playerid FROM winners)
+ORDER BY manager_name, year
+
+-- ANSWER: Davey Johnson (BAL and WAS) and Jim Leyland (PIT and DET)
+
+/* QUESTION 10: Find all players who hit their career highest number of home runs in 2016. 
+Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. 
+Report the players' first and last names and the number of home runs they hit in 2016.*/
+
+WITH highest_2016 AS
+(SELECT playerid,
+ CASE WHEN hr = MAX(hr) OVER (PARTITION BY playerid) AND yearid = 2016 THEN hr
+ END AS career_highest_2016
+ FROM batting
+ GROUP BY playerid, hr, yearid
+ ORDER BY playerid)
+SELECT namefirst || ' ' || namelast AS player_name,
+h.career_highest_2016 AS num_hr
+FROM highest_2016 AS h
+LEFT JOIN people AS p
+ON h.playerid = p.playerid
+WHERE h.career_highest_2016 IS NOT NULL
+AND h.career_highest_2016 > 0
+AND DATE_PART('year', p.debut::DATE) <= 2007
+ORDER BY num_hr DESC;
+
+
+
+
 
 
 
