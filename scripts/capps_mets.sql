@@ -72,15 +72,15 @@ ORDER BY decade;
 -- (A stolen base attempt results either in a stolen base or being caught stealing.) 
 -- Consider only players who attempted at least 20 stolen bases.
 
-SELECT namefirst, namelast, SUM(sb)/(SUM(sb)+SUM(cs))::numeric * 100 AS success_sb
+SELECT namefirst || ' ' || namelast AS player_name, 
+ROUND(SUM(sb)/(SUM(sb)+SUM(cs))::numeric * 100, 1) AS success_sb
 FROM batting
 INNER JOIN people
 USING (playerid)
 WHERE yearid = '2016'
-GROUP BY namefirst, namelast
+GROUP BY player_name
 HAVING (SUM(sb)+SUM(cs)) >= 20
-ORDER BY success_sb DESC
-LIMIT 1;
+ORDER BY success_sb DESC;
 
 -- ANSWER: Chris Owings 91.3%
 
@@ -95,7 +95,7 @@ WHERE yearid >= '1970' AND wswin = 'N'
 GROUP BY name, yearid, w, wswin
 ORDER BY w DESC
 LIMIT 1)
-UNION
+UNION 
 (SELECT name, yearid, w, wswin
 FROM teams
 WHERE yearid >= '1970' AND wswin = 'Y' AND yearid <> '1981'
@@ -212,6 +212,139 @@ WHERE h.career_highest_2016 IS NOT NULL
 AND h.career_highest_2016 > 0
 AND DATE_PART('year', p.debut::DATE) <= 2007
 ORDER BY num_hr DESC;
+
+-- PRESENTATION
+
+SELECT *
+FROM awardsplayers
+WHERE yearid >= '2000';
+
+SELECT s.yearid, namefirst || ' ' || namelast AS player_name, salary
+FROM salaries AS s
+INNER JOIN people
+USING (playerid)
+WHERE s.yearid >= '2000' 
+	AND (s.yearid, salary) 
+	IN (SELECT yearid, MAX(salary)
+		FROM salaries
+	    GROUP BY yearid)
+
+
+SELECT DISTINCT s.yearid, namefirst || ' ' || namelast AS player_name, salary,
+	CASE
+		WHEN awardid = 'Most Valuable Player' THEN 'YES'
+		ELSE 'NO'
+		END AS MVP
+FROM salaries AS s
+INNER JOIN people
+USING (playerid)
+LEFT JOIN awardsplayers
+USING (playerid, yearid)
+WHERE s.yearid >= '2000' 
+	AND (s.yearid, salary) 
+	IN (SELECT s.yearid, MAX(salary)
+		FROM salaries
+	    GROUP BY s.yearid)
+		
+SELECT s.yearid, s.playerid, namefirst || ' ' || namelast AS player_name, salary, awardid
+FROM salaries AS s
+LEFT JOIN people
+USING (playerid)
+LEFT JOIN awardsplayers AS a
+ON s.playerid = a.playerid AND s.yearid = a.yearid
+WHERE s.yearid >= '2000' 
+AND a.yearid >= '2000'
+AND awardid = 'Most Valuable Player'
+	AND (s.yearid, salary) 
+	IN (SELECT yearid, MAX(salary)
+		FROM salaries
+	    GROUP BY yearid)
+
+SELECT *
+FROM awardsplayers
+WHERE awardid = 'Most Valuable Player'
+AND yearid >= '2000'
+
+
+				
+SELECT yearid, namefirst || ' ' || namelast AS player_name, lgid, awardid
+FROM awardsplayers
+INNER JOIN people
+USING (playerid)
+WHERE yearid >= '2000' AND awardid = 'Most Valuable Player'
+
+select a.yearid, a.playerid,p.namefirst || ' ' || p.namelast AS player_name, a.salary, c.awardid, c.lgid, c.playerid as mvp_player_id, e.namefirst || ' ' || e.namelast AS mvp_player_name,
+	CASE 
+			WHEN a.playerid = c.playerid AND a.yearid = c.yearid 
+			THEN 'YES' ELSE 'NO' 
+			END AS mvp_flag
+	from salaries as a
+	INNER JOIN 
+	(select DISTINCT salaries.yearid, max(salary) as max_salary
+	from salaries
+	where salaries.yearid >=2000
+	group by salaries.yearid) as b
+	ON a.yearid = b.yearid
+	and a.salary = b.max_salary
+	INNER JOIN people as p
+		ON a.playerid = p.playerid
+	LEFT JOIN awardsplayers as c
+		--ON a.playerid = c.playerid
+		On a.yearid = c.yearid
+	INNER JOIN people as e
+		ON c.playerid = e.playerid
+	where c.yearid >= 2000
+	and awardid = 'Most Valuable Player'
+	and c.lgid = 'AL'
+	
+select a.yearid, a.playerid,p.namefirst || ' ' || p.namelast AS player_name, a.salary, c.awardid, c.lgid, c.playerid as mvp_player_id, e.namefirst || ' ' || e.namelast AS mvp_player_name,
+	CASE 
+			WHEN a.playerid = c.playerid AND a.yearid = c.yearid 
+			THEN 'YES' ELSE 'NO' 
+			END AS mvp_flag
+	from salaries as a
+	INNER JOIN 
+	(select DISTINCT salaries.yearid, max(salary) as max_salary
+	from salaries
+	where salaries.yearid >=2000
+	group by salaries.yearid) as b
+	ON a.yearid = b.yearid
+	and a.salary = b.max_salary
+	INNER JOIN people as p
+		ON a.playerid = p.playerid
+	LEFT JOIN awardsplayers as c
+		--ON a.playerid = c.playerid
+		On a.yearid = c.yearid
+	INNER JOIN people as e
+		ON c.playerid = e.playerid
+	where c.yearid >= 2000
+	and awardid = 'Most Valuable Player'
+	and c.lgid = 'NL'
+	
+select a.yearid, a.playerid,p.namefirst || ' ' || p.namelast AS player_name, a.salary, c.awardid, c.playerid as mvp_player_id, c.lgid, e.namefirst || ' ' || e.namelast AS mvp_player_name,
+	CASE 
+			WHEN a.playerid = c.playerid AND a.yearid = c.yearid 
+			THEN 'YES' ELSE 'NO' 
+			END AS mvp_flag
+	from salaries as a
+	INNER JOIN 
+	(select DISTINCT salaries.yearid, max(salary) as max_salary
+	from salaries
+	where salaries.yearid >=2000
+	group by salaries.yearid) as b
+	ON a.yearid = b.yearid
+	and a.salary = b.max_salary
+	INNER JOIN people as p
+		ON a.playerid = p.playerid
+	LEFT JOIN awardsplayers as c
+		--ON a.playerid = c.playerid
+		On a.yearid = c.yearid
+	INNER JOIN people as e
+		ON c.playerid = e.playerid
+	where c.yearid >= 2000
+	and awardid = 'Most Valuable Player'
+
+
 
 
 
