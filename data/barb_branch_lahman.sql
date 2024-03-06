@@ -88,7 +88,7 @@ order by decade
 
 ************************************************************************************************
 
--- 6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.  !!! GOOD TO GO :)
+-- 6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
 
 
 select 
@@ -106,34 +106,33 @@ order by sb_pct desc
 
 ************************************************************************************************
 
--- 7. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
+-- 7. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. 
+
+-- ** main question **How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 
 -- From 1970 – 2016, what is the largest number of wins for a team that did not win the world series?
 select
-	yearid as year,
 	name as team,
-	WSWin,
-	w AS wins,
+	MAX(w) AS wins,
 	l as losses
 from teams
 where WSWin is not null
 	and WSWin = 'N'
 	and yearid BETWEEN 1970 AND 2016
+group by year, team, WSWin, losses
 order by wins desc;
 -- 116 wins, Seattle Mariners
 
 
 -- What is the smallest number of wins for a team that did win the world series?
 select 
-	yearid as year,
 	name as team,
-	WSWin,
-	w AS wins,
-	l AS losses
+	MIN(w) AS wins
 from teams
 where wswin is not null
 	and wswin = 'Y'
 	and yearid BETWEEN 1970 AND 2016
+group by team
 order by wins;
 -- 63 wins, Los Angeles Dodgers
 
@@ -143,68 +142,97 @@ order by wins;
 	
 -- Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 
-WITH teams_1970_2016 AS
+WITH most_wins_per_season AS (
 
-(
-select
-	yearid as year,
-	name as team,
-	WSWin as world_series_winner,
-	MAX(w) AS wins,                                                             -- !!! ALMOST DONE, NEED TO FINALIZE THE END OF THE QUESTION !!! --
-	l as losses
-from teams
-where WSWin is not null
-	and WSWin = 'N'
-	and yearid BETWEEN 1970 AND 2016
-group by year, team, world_series_winner, losses
-	
-UNION ALL
+	select                                              
+		yearid,
+		MAX(w) as w
+	from teams						/*returns the most wins in each SEASON*/				
+	where yearid >= 1970
+	and yearid <> 1981
+	group by yearid
+	order by yearid
+),
 
-select 
-	yearid as year,
-	name as team,
-	WSWin as world_series_winner,
-	MAX(w) AS wins,
-	l AS losses
-from teams
-where wswin is not null
-	and wswin = 'Y'
-	and yearid BETWEEN 1970 AND 2016
-group by year, team, world_series_winner, losses
+teams_that_WON_the_WS AS  (
+	select 
+		yearid,
+		name,                      /*adding this into the CTE gives us all the teams with the most wins each season, and whether or not they won the WS*/
+		WSWin
+	from teams
+	inner join most_wins_per_season
+	using (yearid, w)
 )
 
-
-SELECT 
-	year,
-	team,
-	world_series_winner,
-	wins
-FROM teams_1970_2016
-WHERE year <> 1981
-ORDER BY wins DESC;
+SELECT
+	(select count(*)
+	 from teams_that_WON_the_WS
+	 where WSWin = 'Y') * 100.0
+	 /
+	 (select count(*)
+	  from teams_that_WON_the_WS) as perc_of_wins   
 
 ************************************************************************************************
 
 -- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
 
-(
-SELECT 
+
+SELECT * FROM (
+
+SELECT
+	year,
 	park_name,
-	t.name,
-	hg.attendance / hg.games
-	--SUM(hg.attendance) / SUM(hg.games) AS avg_attendance_per_game
-FROM parks as p
-INNER JOIN homegames as hg
+	name,
+	hg.attendance / hg.games as avg_attendance_per_game
+	
+FROM homegames as hg
+INNER JOIN parks as p
 USING (park)
 INNER JOIN teams as t
-USING (park)
-                                             /* UPDATE... */
+ON team = teamid AND year = yearid
 
-WHERE yearid = 2016
+WHERE year = 2016
 	AND games >= 10
-GROUP BY t.name, hg.park
-ORDER BY avg_attendance_per_game desc
-LIMIT 5
+GROUP BY year, park_name, name, hg.attendance, hg.games
+ORDER BY avg_attendance_per_game DESC
+LIMIT 5	
+) as top_5
+
+UNION
+
+SELECT
+	year,
+	park_name,
+	name,
+	hg.attendance / hg.games as avg_attendance_per_game
+	
+FROM homegames as hg
+INNER JOIN parks as p
+USING (park)
+INNER JOIN teams as t
+ON team = teamid AND year = yearid
+
+WHERE year = 2016
+	AND games >= 10
+-- GROUP BY year, park_name, name, hg.attendance, hg.games
+ORDER BY avg_attendance_per_game
+-- LIMIT 5
+	
+
+	
+	
+	
+
+-- LEFT JOIN teams as t
+-- ON hg.year = t.yearid AND hg.park = hg.park AND hg.attendance = t.attendance AND hg.team = t.name
+-- INNER JOIN parks as p
+-- ON t.park = p.park
+                                             /* UPDATE... */
+-- WHERE yearid = 2016
+-- 	AND games >= 10
+-- GROUP BY p.park, t.name
+-- ORDER BY avg_attendance_per_game desc
+-- LIMIT 5
 )
 	
 UNION ALL
@@ -213,16 +241,18 @@ UNION ALL
 SELECT 
 	park_name,
 	t.name,
-	hg.attendance / hg.games
-	--SUM(hg.attendance) / SUM(hg.games) AS avg_attendance_per_game
+	hg.attendance / hg.games,
+	SUM(hg.attendance) / SUM(hg.games) AS avg_attendance_per_game
 	
 FROM homegames as hg
 INNER JOIN teams as t
 ON hg.team = t.teamid
+INNER JOIN parks as p
+USING (park)
 
 WHERE yearid = 2016
 	AND games >= 10
-GROUP BY t.name, hg.park
+GROUP BY park_name, t.name, hg.park
 ORDER BY avg_attendance_per_game
 LIMIT 5
 )
