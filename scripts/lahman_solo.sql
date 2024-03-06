@@ -1,114 +1,165 @@
-Solo exploration ideas:
-Correlation between salary and performance (scatterplot, avg salary for each quartile of wins, hypothesis test...) Would need to account for mid-season trades? Is this reflected in tables?
-SELECT * FROM salaries ORDER BY playerid, teamid
+-- Analyze the relationship between player age and performance metrics.
+-- Explore if there is an optimal age range for peak performance.
 
-SELECT
-	yearid,
-	teamid,
-	AVG(salary),
-	AVG(w)
-FROM teams
-INNER JOIN salaries
-USING(yearid, teamid)
-GROUP BY yearid, teamid
-ORDER BY yearid, teamid
-
---correlation wins and salary
-SELECT corr(t.W, s.salary) AS correlation_wins_salary
-FROM teams t
-JOIN salaries s ON t.teamid = s.teamid AND t.yearid = s.yearid
-WHERE t.w IS NOT NULL
-    AND s.salary IS NOT NULL
-	
---quartiles with avg salary	
-WITH team_quartiles AS (
-    SELECT teams.teamid,
-        teams.yearid,
-        w,
-        salary,
-        NTILE(4) OVER (ORDER BY W) AS win_quartile
-    FROM teams
-    JOIN salaries ON Teams.teamid = aalaries.teamid AND teams.yearid = salaries.yearid
-    WHERE teams.w IS NOT NULL
-        AND salaries.salary IS NOT NULL AND teams.yearid BETWEEN 2000 AND 2016
-)
-
-SELECT win_quartile,
-    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY salary) AS median_salary
-FROM team_quartiles
-GROUP BY win_quartile
-ORDER BY win_quartile;
-
---OR moneyball effect
---Boston Red Sox - team was purchased in 2002 and Bill James hired to use sabermetrics
---Oakland was doing really well in 80s, got bad after budget cuts, and used analytics to improve 90s/2000s
-
-SELECT yearid, w
-FROM teams
-WHERE name ILIKE '%Oakland%'
-ORDER BY yearid DESC
-
--- Identify the teams that were early adopters of Moneyball metrics during the specified era.
--- Calculate the average values of key Moneyball metrics (OBP, SLG, OPS) for these teams over time.
-SELECT
-    yearid,
-    AVG((h + bb + hbp)::numeric / (ab + bb + hbp + sf)) AS avg_obp,
-    AVG((h + h2b + (2 * h3b) + (3 * hr))::numeric / ab) AS avg_slg,
-    AVG((h + bb + hbp)::numeric / (ab + bb + hbp + sf) + (h + 2 * h2b + 3 * h3b + 4 * hr)::numeric / ab) AS avg_ops
-FROM teams
---WHERE teamID IN ('Replace with Moneyball teams')
-GROUP BY yearID
-ORDER BY yearID;
-
---looking at early adopters
-
-SELECT
-    name,
-	MIN(yearid),
-    AVG((h + bb + hbp)::numeric / (ab + bb + hbp + sf)) AS avg_obp,
-    AVG((h + h2b + (2 * h3b) + (3 * hr))::numeric / ab) AS avg_slg,
-    AVG((h + bb + hbp)::numeric / (ab + bb + hbp + sf) + (h + 2 * h2b + 3 * h3b + 4 * hr)::numeric / ab) AS avg_ops
-FROM teams
-GROUP BY name
-HAVING AVG((h + bb + hbp)::numeric / (ab + bb + hbp + sf)) IS NOT NULL
-	AND AVG((h + bb + hbp)::numeric / (ab + bb + hbp + sf) + (h + 2 * h2b + 3 * h3b + 4 * hr)::numeric / ab) IS NOT NULL
-ORDER BY  MIN(yearid);
-
---hall of famers
-
-SELECT * FROM halloffame WHERE inducted = 'Y'
-
---player age and performance
+--Here is the aggregated query
 
 WITH player_stats AS (
     SELECT
         playerid,
-        MAX(yearid) - birthyear AS age,
-        AVG(h) AS avg_h,
-        AVG(ab) AS avg_ab,
-        AVG(bb) AS avg_bb,
-        AVG(hbp) AS avg_hbp,
-        AVG(sf) AS avg_sf,
-        AVG(h2b) AS avg_h2b,
-        AVG(h3b) AS avg_h3b,
-        AVG(hr) AS avg_hr
+        yearid - birthyear AS age,
+        AVG(h) AS avg_h, --hits
+        AVG(ab) AS avg_ab, --at bats
+        AVG(bb) AS avg_bb, --base on balls
+        AVG(hbp) AS avg_hbp, --hit by pitch
+        AVG(sf) AS avg_sf, --sacrifice flies
+        AVG(h2b) AS avg_h2b, --doubles
+        AVG(h3b) AS avg_h3b, --triples
+        AVG(hr) AS avg_hr --homeruns
     FROM
         batting
     INNER JOIN people USING(playerid)
     WHERE
         ab > 100  -- Consider players with at least 100 at-bats
     GROUP BY
-        playerid, birthyear
+        playerid, age
 )
 SELECT
     age AS age_group,
-    ROUND(COALESCE(AVG(avg_h / NULLIF(avg_ab, 0)), 0)::NUMERIC, 3) AS avg_BattingAverage,
-    ROUND(COALESCE(AVG((avg_h + avg_Bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)), 0)::NUMERIC, 3) AS avg_obp,
-    ROUND(COALESCE(AVG((avg_h + avg_h2b + (2 * avg_h3B) + (3 * avg_hr)) / NULLIF(avg_ab, 0)), 0)::NUMERIC, 3) AS avg_slg,
-    ROUND(COALESCE(AVG(((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)) + ((avg_h + 2 * avg_h2b + 3 * avg_h3b + 4 * avg_hr) / NULLIF(avg_ab, 0))), 0)::NUMERIC, 3) AS avg_ops
+	COUNT(age),
+    ROUND(COALESCE(AVG(avg_h / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS avg_batting_average, --(not used for sabermetrics, may take this out)
+    ROUND(COALESCE(AVG((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)), 0)::numeric, 3) AS avg_obp, --on base percentage
+    ROUND(COALESCE(AVG((avg_h + avg_h2b + (2 * avg_h3B) + (3 * avg_hr)) / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS avg_slg, --slugging percentage
+    ROUND(COALESCE(AVG(((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)) + ((avg_h + 2 * avg_h2b + 3 * avg_h3b + 4 * avg_hr) / NULLIF(avg_ab, 0))), 0)::numeric, 3) AS avg_ops --on base plus slugging
 FROM
     player_stats
 GROUP BY
     age_group
 ORDER BY
     age_group;
+	
+--And this one is non-aggregated:
+
+WITH player_stats AS (
+    SELECT
+        playerid,
+        yearid - birthyear AS age,
+        AVG(h) AS avg_h, --hits
+        AVG(ab) AS avg_ab, --at bats
+        AVG(bb) AS avg_bb, --base on balls
+        AVG(hbp) AS avg_hbp, --hit by pitch
+        AVG(sf) AS avg_sf, --sacrifice flies
+        AVG(h2b) AS avg_h2b, --doubles
+        AVG(h3b) AS avg_h3b, --triples
+        AVG(hr) AS avg_hr --homeruns
+    FROM
+        batting
+    INNER JOIN people USING(playerid)
+    WHERE
+        ab > 100  -- Consider players with at least 100 at-bats
+    GROUP BY
+        playerid, age
+)
+SELECT
+    playerid,
+	age AS age_group,
+	ROUND(COALESCE(avg_h / NULLIF(avg_ab, 0), 0)::numeric, 3) AS batting_average, --(not used for sabermetrics, may take this out)
+    ROUND(COALESCE((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0), 0)::numeric, 3) AS obp, --on base percentage
+    ROUND(COALESCE((avg_h + avg_h2b + (2 * avg_h3B) + (3 * avg_hr)) / NULLIF(avg_ab, 0), 0)::numeric, 3) AS slg, --slugging percentage
+    ROUND(COALESCE(((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)) + ((avg_h + 2 * avg_h2b + 3 * avg_h3b + 4 * avg_hr) / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS ops --on base plus slugging
+FROM
+    player_stats
+ORDER BY
+    playerid, age_group;
+
+--looking at players who played through age 40
+--unaggregated
+
+WITH over_40 AS (
+	 SELECT
+        playerid,
+        yearid - birthyear AS age,
+        AVG(h) AS avg_h, --hits
+        AVG(ab) AS avg_ab, --at bats
+        AVG(bb) AS avg_bb, --base on balls
+        AVG(hbp) AS avg_hbp, --hit by pitch
+        AVG(sf) AS avg_sf, --sacrifice flies
+        AVG(h2b) AS avg_h2b, --doubles
+        AVG(h3b) AS avg_h3b, --triples
+        AVG(hr) AS avg_hr --homeruns
+    FROM
+        batting
+    INNER JOIN people USING(playerid)
+    WHERE
+        ab > 100  -- Consider players with at least 100 at-bats
+		AND playerid IN (SELECT
+				playerid
+			FROM
+				batting
+			INNER JOIN people USING(playerid)
+			WHERE
+				ab > 100  -- Consider players with at least 100 at-bats
+				AND yearid - birthyear >= 40
+			)
+    GROUP BY
+        playerid, age
+) 
+SELECT
+    playerid,
+	age AS age_group,
+	ROUND(COALESCE(avg_h / NULLIF(avg_ab, 0), 0)::numeric, 3) AS batting_average, --(not used for sabermetrics, may take this out)
+    ROUND(COALESCE((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0), 0)::numeric, 3) AS obp, --on base percentage
+    ROUND(COALESCE((avg_h + avg_h2b + (2 * avg_h3B) + (3 * avg_hr)) / NULLIF(avg_ab, 0), 0)::numeric, 3) AS slg, --slugging percentage
+    ROUND(COALESCE(((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)) + ((avg_h + 2 * avg_h2b + 3 * avg_h3b + 4 * avg_hr) / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS ops --on base plus slugging
+FROM
+    over_40
+ORDER BY
+    playerid, age_group;
+	
+--and aggregated 40+
+
+WITH over_40 AS (
+	 SELECT
+        playerid,
+        yearid - birthyear AS age,
+        AVG(h) AS avg_h, --hits
+        AVG(ab) AS avg_ab, --at bats
+        AVG(bb) AS avg_bb, --base on balls
+        AVG(hbp) AS avg_hbp, --hit by pitch
+        AVG(sf) AS avg_sf, --sacrifice flies
+        AVG(h2b) AS avg_h2b, --doubles
+        AVG(h3b) AS avg_h3b, --triples
+        AVG(hr) AS avg_hr --homeruns
+    FROM
+        batting
+    INNER JOIN people USING(playerid)
+    WHERE
+        ab > 100  -- Consider players with at least 100 at-bats
+		AND playerid IN (SELECT
+				playerid
+			FROM
+				batting
+			INNER JOIN people USING(playerid)
+			WHERE
+				ab > 100  -- Consider players with at least 100 at-bats
+				AND yearid - birthyear >= 40
+			)
+    GROUP BY
+        playerid, age
+) 
+SELECT
+    age AS age_group,
+	COUNT(age),
+    --ROUND(COALESCE(AVG(avg_h / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS avg_batting_average, --(not used for sabermetrics, may take this out)
+    ROUND(COALESCE(AVG((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)), 0)::numeric, 3) AS avg_obp, --on base percentage
+    ROUND(COALESCE(AVG((avg_h + avg_h2b + (2 * avg_h3B) + (3 * avg_hr)) / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS avg_slg, --slugging percentage
+    ROUND(COALESCE(AVG(((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)) + ((avg_h + 2 * avg_h2b + 3 * avg_h3b + 4 * avg_hr) / NULLIF(avg_ab, 0))), 0)::numeric, 3) AS avg_ops --on base plus slugging
+FROM
+    over_40
+GROUP BY
+    age_group
+ORDER BY
+    age_group;
+	
+--Finding the outlier francju01
+
+SELECT namefirst || ' ' || namelast AS player_name FROM people where playerid = 'francju01'
