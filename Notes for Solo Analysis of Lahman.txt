@@ -1,0 +1,34 @@
+1. How many left handed (batting/throwing) players are there in the database? 3615
+
+2. What percentage of left-handed players are there? 14.8%
+
+3. Top 3 players with the most games played who were lefties.
+	a. position(s)?
+	b. total games?
+	c. total salary?
+
+4. First lefties in the database?
+
+	
+
+
+
+[MAIN QUERY FOR MY DATA ANALYSIS]
+
+select 
+	playerid,
+	CONCAT(namefirst,' ',namelast) as player_name,
+	SUM(g_all) as total_games,
+	throws as throwing_hand
+from appearances
+inner join people
+using (playerid)
+where throws = 'L'
+group by playerid, player_name, throws
+order by total_games desc
+limit 3
+
+
+"musiast01"	"Stan Musial"
+"bondsba01"	"Barry Bonds"
+""baineha01""	Harold Baines 

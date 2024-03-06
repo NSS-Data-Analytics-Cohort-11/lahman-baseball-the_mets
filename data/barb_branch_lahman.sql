@@ -340,22 +340,3 @@ WHERE h.career_highest_2016 IS NOT NULL
 	AND DATE_PART('year', p.debut::DATE) <= 2007
 ORDER BY num_hr DESC;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
