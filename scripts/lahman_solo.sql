@@ -1,7 +1,7 @@
 -- Analyze the relationship between player age and performance metrics.
 -- Explore if there is an optimal age range for peak performance.
 
---Here is the aggregated query
+--AGGREGATED
 
 WITH player_stats AS (
     SELECT
@@ -15,13 +15,10 @@ WITH player_stats AS (
         AVG(h2b) AS avg_h2b, --doubles
         AVG(h3b) AS avg_h3b, --triples
         AVG(hr) AS avg_hr --homeruns
-    FROM
-        batting
+    FROM batting
     INNER JOIN people USING(playerid)
-    WHERE
-        ab > 100  -- Consider players with at least 100 at-bats
-    GROUP BY
-        playerid, age
+    WHERE ab > 100  -- Consider players with at least 100 at-bats
+    GROUP BY playerid, age
 )
 SELECT
     age AS age_group,
@@ -30,14 +27,11 @@ SELECT
     ROUND(COALESCE(AVG((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)), 0)::numeric, 3) AS avg_obp, --on base percentage
     ROUND(COALESCE(AVG((avg_h + avg_h2b + (2 * avg_h3B) + (3 * avg_hr)) / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS avg_slg, --slugging percentage
     ROUND(COALESCE(AVG(((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)) + ((avg_h + 2 * avg_h2b + 3 * avg_h3b + 4 * avg_hr) / NULLIF(avg_ab, 0))), 0)::numeric, 3) AS avg_ops --on base plus slugging
-FROM
-    player_stats
-GROUP BY
-    age_group
-ORDER BY
-    age_group;
+FROM player_stats
+GROUP BY age_group
+ORDER BY age_group;
 	
---And this one is non-aggregated:
+--UNAGGREGATED
 
 WITH player_stats AS (
     SELECT
@@ -51,13 +45,10 @@ WITH player_stats AS (
         AVG(h2b) AS avg_h2b, --doubles
         AVG(h3b) AS avg_h3b, --triples
         AVG(hr) AS avg_hr --homeruns
-    FROM
-        batting
+    FROM batting
     INNER JOIN people USING(playerid)
-    WHERE
-        ab > 100  -- Consider players with at least 100 at-bats
-    GROUP BY
-        playerid, age
+    WHERE ab > 100  -- Consider players with at least 100 at-bats
+    GROUP BY playerid, age
 )
 SELECT
     playerid,
@@ -66,13 +57,12 @@ SELECT
     ROUND(COALESCE((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0), 0)::numeric, 3) AS obp, --on base percentage
     ROUND(COALESCE((avg_h + avg_h2b + (2 * avg_h3B) + (3 * avg_hr)) / NULLIF(avg_ab, 0), 0)::numeric, 3) AS slg, --slugging percentage
     ROUND(COALESCE(((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)) + ((avg_h + 2 * avg_h2b + 3 * avg_h3b + 4 * avg_hr) / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS ops --on base plus slugging
-FROM
-    player_stats
-ORDER BY
-    playerid, age_group;
+FROM player_stats
+ORDER BY playerid, age_group;
 
 --looking at players who played through age 40
---unaggregated
+
+--UNAGGREGATED 40+
 
 WITH over_40 AS (
 	 SELECT
@@ -86,22 +76,17 @@ WITH over_40 AS (
         AVG(h2b) AS avg_h2b, --doubles
         AVG(h3b) AS avg_h3b, --triples
         AVG(hr) AS avg_hr --homeruns
-    FROM
-        batting
+    FROM batting
     INNER JOIN people USING(playerid)
-    WHERE
-        ab > 100  -- Consider players with at least 100 at-bats
-		AND playerid IN (SELECT
-				playerid
-			FROM
-				batting
+    WHERE ab > 100  -- Consider players with at least 100 at-bats
+		AND playerid IN (
+			SELECT playerid
+			FROM batting
 			INNER JOIN people USING(playerid)
-			WHERE
-				ab > 100  -- Consider players with at least 100 at-bats
+			WHERE ab > 100  -- Consider players with at least 100 at-bats
 				AND yearid - birthyear >= 40
 			)
-    GROUP BY
-        playerid, age
+    GROUP BY playerid, age
 ) 
 SELECT
     playerid,
@@ -110,12 +95,10 @@ SELECT
     ROUND(COALESCE((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0), 0)::numeric, 3) AS obp, --on base percentage
     ROUND(COALESCE((avg_h + avg_h2b + (2 * avg_h3B) + (3 * avg_hr)) / NULLIF(avg_ab, 0), 0)::numeric, 3) AS slg, --slugging percentage
     ROUND(COALESCE(((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)) + ((avg_h + 2 * avg_h2b + 3 * avg_h3b + 4 * avg_hr) / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS ops --on base plus slugging
-FROM
-    over_40
-ORDER BY
-    playerid, age_group;
+FROM over_40
+ORDER BY playerid, age_group;
 	
---and aggregated 40+
+--AGGREGATED 40+
 
 WITH over_40 AS (
 	 SELECT
@@ -129,37 +112,31 @@ WITH over_40 AS (
         AVG(h2b) AS avg_h2b, --doubles
         AVG(h3b) AS avg_h3b, --triples
         AVG(hr) AS avg_hr --homeruns
-    FROM
-        batting
+    FROM batting
     INNER JOIN people USING(playerid)
-    WHERE
-        ab > 100  -- Consider players with at least 100 at-bats
-		AND playerid IN (SELECT
-				playerid
-			FROM
-				batting
+    WHERE ab > 100  -- Consider players with at least 100 at-bats
+		AND playerid IN (
+			SELECT playerid
+			FROM batting
 			INNER JOIN people USING(playerid)
-			WHERE
-				ab > 100  -- Consider players with at least 100 at-bats
+			WHERE ab > 100  -- Consider players with at least 100 at-bats
 				AND yearid - birthyear >= 40
 			)
-    GROUP BY
-        playerid, age
+    GROUP BY playerid, age
 ) 
 SELECT
     age AS age_group,
-	COUNT(age),
+	--COUNT(age),
     --ROUND(COALESCE(AVG(avg_h / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS avg_batting_average, --(not used for sabermetrics, may take this out)
     ROUND(COALESCE(AVG((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)), 0)::numeric, 3) AS avg_obp, --on base percentage
     ROUND(COALESCE(AVG((avg_h + avg_h2b + (2 * avg_h3B) + (3 * avg_hr)) / NULLIF(avg_ab, 0)), 0)::numeric, 3) AS avg_slg, --slugging percentage
     ROUND(COALESCE(AVG(((avg_h + avg_bb + avg_hbp) / NULLIF(avg_ab + avg_bb + avg_hbp + avg_sf, 0)) + ((avg_h + 2 * avg_h2b + 3 * avg_h3b + 4 * avg_hr) / NULLIF(avg_ab, 0))), 0)::numeric, 3) AS avg_ops --on base plus slugging
-FROM
-    over_40
-GROUP BY
-    age_group
-ORDER BY
-    age_group;
+FROM over_40
+GROUP BY age_group
+ORDER BY age_group;
 	
---Finding the outlier francju01
+--Finding the outlier (francju01)
 
-SELECT namefirst || ' ' || namelast AS player_name FROM people where playerid = 'francju01'
+SELECT namefirst || ' ' || namelast AS player_name 
+FROM people 
+WHERE playerid = 'francju01'
