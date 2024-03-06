@@ -174,11 +174,12 @@ SELECT
 
 ************************************************************************************************
 
--- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+-- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.    !!!! COME BACK TO THIS ONE AFTER FINISHING RECORDING !!!!!
 
 
-SELECT * FROM (
+SELECT * FROM
 
+(
 SELECT
 	year,
 	park_name,
@@ -195,11 +196,10 @@ WHERE year = 2016
 	AND games >= 10
 GROUP BY year, park_name, name, hg.attendance, hg.games
 ORDER BY avg_attendance_per_game DESC
-LIMIT 5	
-) as top_5
+LIMIT 5) AS top_5
+	
 
-UNION
-
+(
 SELECT
 	year,
 	park_name,
@@ -214,12 +214,12 @@ ON team = teamid AND year = yearid
 
 WHERE year = 2016
 	AND games >= 10
--- GROUP BY year, park_name, name, hg.attendance, hg.games
+GROUP BY year, park_name, name, hg.attendance, hg.games
 ORDER BY avg_attendance_per_game
--- LIMIT 5
-	
+LIMIT 5
+) as bottom_5
 
-	
+
 	
 	
 
