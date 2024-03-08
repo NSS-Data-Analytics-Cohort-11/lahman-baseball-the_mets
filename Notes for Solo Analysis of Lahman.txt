@@ -32,3 +32,14 @@ limit 3
 "musiast01"	"Stan Musial"
 "bondsba01"	"Barry Bonds"
 ""baineha01""	Harold Baines 
+
+
+
+///////////// THOUGHTS ///////////// 
+
+-- throw L and bat B: 183
+-- throw R and bat B: 977
+
+-- Ken Griffrey SR and JR both played in the MLB and both were left-handed batters and throwers.
+
+-- players that were left-handed played and managed a team later
